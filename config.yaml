@@ -44,15 +44,16 @@ scanner:
       - 1H
     entry:
       - 15m
-      - 5m
 
 strategy:
   swing_left: 3
   swing_right: 3
-  min_rr: 1.5
+  min_rr: 2.0
   max_stop_pct_10x: 1.5
   order_block_lookback: 12
   signal_cooldown_minutes: 180
+  min_body_pct: 0.4
+  min_volume_multiplier: 1.2
 
 output:
   log_file: logs/signals.jsonl

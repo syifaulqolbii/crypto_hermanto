@@ -12,6 +12,21 @@ def _rr(entry: float, stop: float, target: float, side: str) -> float:
     return round(reward / risk, 2)
 
 
+def _body_pct(candle: Candle) -> float:
+    """Candle body size as % of total range."""
+    total = candle.high - candle.low
+    if total == 0:
+        return 0.0
+    return abs(candle.close - candle.open) / total
+
+
+def _avg_volume(candles: list[Candle], lookback: int = 20) -> float:
+    recent = candles[-lookback:] if len(candles) >= lookback else candles
+    if not recent:
+        return 0.0
+    return sum(c.volume for c in recent) / len(recent)
+
+
 def scan_symbol(
     symbol: str,
     entry_timeframe: str,
@@ -25,8 +40,10 @@ def scan_symbol(
     left = int(config["strategy"].get("swing_left", 3))
     right = int(config["strategy"].get("swing_right", 3))
     lookback = int(config["strategy"].get("order_block_lookback", 12))
-    min_rr = float(config["strategy"].get("min_rr", 1.5))
+    min_rr = float(config["strategy"].get("min_rr", 2.0))
     max_stop_pct_10x = float(config["strategy"].get("max_stop_pct_10x", 1.5))
+    min_body_pct = float(config["strategy"].get("min_body_pct", 0.4))
+    min_vol_mult = float(config["strategy"].get("min_volume_multiplier", 1.2))
 
     biases = [market_bias(candles, left, right) for candles in bias_candles.values() if candles]
     bullish_bias = biases and all(bias in {"bullish", "neutral"} for bias in biases) and "bullish" in biases
@@ -39,6 +56,15 @@ def scan_symbol(
     last = entry_candles[-1]
     previous = entry_candles[-2]
     ts = last.ts
+
+    # Filter 1: displacement candle must have strong body
+    if _body_pct(last) < min_body_pct:
+        return None
+
+    # Filter 2: displacement candle volume must be above average
+    avg_vol = _avg_volume(entry_candles[:-1], 20)
+    if avg_vol > 0 and last.volume < avg_vol * min_vol_mult:
+        return None
 
     if bullish_bias and swept_low(last, entry_candles[low_index].low) and last.close > previous.high:
         ob = bullish_order_block(entry_candles, len(entry_candles) - 1, lookback)
@@ -65,8 +91,12 @@ def scan_symbol(
             tp1=tp1,
             tp2=tp2,
             rr=rr,
-            confidence=70,
-            reason=f"Swept low {entry_candles[low_index].low} and closed above previous high.",
+            confidence=75,
+            reason=(
+                f"Swept low {entry_candles[low_index].low:.4f}, "
+                f"closed above prev high. Body: {_body_pct(last):.0%}, "
+                f"Vol: {last.volume:.0f} vs avg {avg_vol:.0f}."
+            ),
             ts=ts,
         )
 
@@ -95,8 +125,12 @@ def scan_symbol(
             tp1=tp1,
             tp2=tp2,
             rr=rr,
-            confidence=70,
-            reason=f"Swept high {entry_candles[high_index].high} and closed below previous low.",
+            confidence=75,
+            reason=(
+                f"Swept high {entry_candles[high_index].high:.4f}, "
+                f"closed below prev low. Body: {_body_pct(last):.0%}, "
+                f"Vol: {last.volume:.0f} vs avg {avg_vol:.0f}."
+            ),
             ts=ts,
         )
 
