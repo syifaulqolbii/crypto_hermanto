@@ -17,7 +17,7 @@ scanner:
     - LINK-USDT-SWAP
     - DOT-USDT-SWAP
     - TRX-USDT-SWAP
-    - MATIC-USDT-SWAP
+    - POL-USDT-SWAP
     - LTC-USDT-SWAP
     - BCH-USDT-SWAP
     - UNI-USDT-SWAP
@@ -26,6 +26,18 @@ scanner:
     - FIL-USDT-SWAP
     - APT-USDT-SWAP
     - ARB-USDT-SWAP
+    - JTO-USDT-SWAP
+    - LDO-USDT-SWAP
+    - HYPE-USDT-SWAP
+    - VIRTUAL-USDT-SWAP
+    - FARTCOIN-USDT-SWAP
+    - OP-USDT-SWAP
+    - PEPE-USDT-SWAP
+    - BONK-USDT-SWAP
+    - SHIB-USDT-SWAP
+    - WLD-USDT-SWAP
+    - HBAR-USDT-SWAP
+    - BERA-USDT-SWAP
   timeframes:
     bias:
       - 4H
