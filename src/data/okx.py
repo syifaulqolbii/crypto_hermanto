@@ -2,12 +2,17 @@ import base64
 import hashlib
 import hmac
 import os
+import time
 from datetime import datetime, timezone
 from typing import Any
 
 import httpx
 
 from src.models import Candle
+
+# OKX rate limit: 20 requests per 2 seconds for market endpoints
+# We use a conservative 0.15s delay = ~6 requests/second to stay safe
+_REQUEST_DELAY = 0.15
 
 
 class OkxClient:
@@ -16,6 +21,13 @@ class OkxClient:
         self.api_key = os.getenv("OKX_API_KEY", "")
         self.api_secret = os.getenv("OKX_API_SECRET", "")
         self.passphrase = os.getenv("OKX_API_PASSPHRASE", "")
+        self._last_request_time: float = 0.0
+
+    def _throttle(self) -> None:
+        elapsed = time.monotonic() - self._last_request_time
+        if elapsed < _REQUEST_DELAY:
+            time.sleep(_REQUEST_DELAY - elapsed)
+        self._last_request_time = time.monotonic()
 
     def _timestamp(self) -> str:
         return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
@@ -36,6 +48,7 @@ class OkxClient:
         }
 
     def get(self, path: str, params: dict[str, Any] | None = None, auth: bool = False) -> dict[str, Any]:
+        self._throttle()
         query = ""
         if params:
             query = "?" + "&".join(f"{key}={value}" for key, value in params.items())
