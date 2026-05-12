@@ -12,12 +12,10 @@ class TelegramNotifier:
         self.chat_id = chat_id or os.getenv("TELEGRAM_CHAT_ID", "")
         self.base_url = f"https://api.telegram.org/bot{self.token}"
 
-    def send(self, signal: Signal) -> None:
+    def _send_text(self, text: str) -> None:
         if not self.token or not self.chat_id:
             print("[TelegramNotifier] Token or chat_id not set, skipping.")
             return
-
-        text = f"🚨 *SIGNAL DETECTED*\n\n```\n{format_signal(signal)}\n```"
         try:
             with httpx.Client(timeout=10) as client:
                 response = client.post(
@@ -31,3 +29,8 @@ class TelegramNotifier:
                 response.raise_for_status()
         except Exception as exc:
             print(f"[TelegramNotifier] Failed to send: {exc}")
+
+    def send(self, signal: Signal) -> None:
+        text = f"🚨 *SIGNAL DETECTED*\n\n```\n{format_signal(signal)}\n```"
+        self._send_text(text)
+

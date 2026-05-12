@@ -5,17 +5,15 @@ from src.config import load_config
 from src.data.okx import OkxClient
 from src.notifier.console import ConsoleNotifier
 from src.notifier.telegram import TelegramNotifier
+from src.reviewer import SignalReviewer
 from src.storage import SignalStore
 from src.strategy.signal import scan_symbol
+from src.tracker import SignalTracker
 
 
-def run_once(config: dict) -> int:
-    client = OkxClient(config["data"].get("base_url", "https://www.okx.com"))
-    console = ConsoleNotifier()
-    telegram = TelegramNotifier()
-    cooldown = int(config["strategy"].get("signal_cooldown_minutes", 180))
-    store = SignalStore(config["output"].get("log_file", "logs/signals.jsonl"), cooldown)
-
+def run_once(config: dict, client: OkxClient, store: SignalStore,
+             tracker: SignalTracker, console: ConsoleNotifier,
+             telegram: TelegramNotifier) -> int:
     symbols = config["scanner"].get("symbols", [])
     bias_timeframes = config["scanner"].get("timeframes", {}).get("bias", ["4H", "1H"])
     entry_timeframes = config["scanner"].get("timeframes", {}).get("entry", ["15m", "5m"])
@@ -33,8 +31,18 @@ def run_once(config: dict) -> int:
                     if print_no_signal:
                         print(f"No signal: {symbol} {timeframe}")
                     continue
+
+                # Check if there is already an active signal for this symbol
+                active_signals = tracker.get_active_for_symbol(symbol)
+                if active_signals:
+                    # Active signal exists — skip, reviewer will handle invalidation
+                    if print_no_signal:
+                        print(f"Active signal exists for {symbol}, skipping new signal.")
+                    continue
+
                 if store.should_emit(signal):
                     store.save(signal)
+                    tracker.add(signal)
                     console.send(signal)
                     telegram.send(signal)
                     emitted += 1
@@ -50,14 +58,24 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_config(args.config)
+    client = OkxClient(config["data"].get("base_url", "https://www.okx.com"))
+    console = ConsoleNotifier()
+    telegram = TelegramNotifier()
+    cooldown = int(config["strategy"].get("signal_cooldown_minutes", 180))
+    store = SignalStore(config["output"].get("log_file", "logs/signals.jsonl"), cooldown)
+    tracker = SignalTracker(config["output"].get("state_file", "logs/active_signals.json"))
+    reviewer = SignalReviewer(client, tracker, config)
+
     if args.once:
-        emitted = run_once(config)
+        reviewer.run()
+        emitted = run_once(config, client, store, tracker, console, telegram)
         print(f"Scan complete. Signals: {emitted}")
         return
 
     poll_seconds = int(config["scanner"].get("poll_seconds", 60))
     while True:
-        emitted = run_once(config)
+        reviewer.run()
+        emitted = run_once(config, client, store, tracker, console, telegram)
         print(f"Scan complete. Signals: {emitted}. Sleeping {poll_seconds}s.")
         time.sleep(poll_seconds)
 

@@ -56,4 +56,5 @@ strategy:
 
 output:
   log_file: logs/signals.jsonl
+  state_file: logs/active_signals.json
   print_no_signal: false
