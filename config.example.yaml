@@ -1,0 +1,29 @@
+data:
+  provider: okx
+  base_url: ${OKX_BASE_URL}
+
+scanner:
+  poll_seconds: 60
+  candle_limit: 200
+  symbols:
+    - BTC-USDT-SWAP
+    - ETH-USDT-SWAP
+  timeframes:
+    bias:
+      - 4H
+      - 1H
+    entry:
+      - 15m
+      - 5m
+
+strategy:
+  swing_left: 3
+  swing_right: 3
+  min_rr: 1.5
+  max_stop_pct_10x: 1.5
+  order_block_lookback: 12
+  signal_cooldown_minutes: 180
+
+output:
+  log_file: logs/signals.jsonl
+  print_no_signal: false
